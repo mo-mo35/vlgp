@@ -86,7 +86,7 @@ def infer_single_trial(trial, params, config):
 
             u = G @ (G.T @ (residual @ a[l, :])) - mu[:, l]
             try:
-                M = solve(Ir + GtWG, (wadj * G).T @ u, sym_pos=True)
+                M = solve(Ir + GtWG, (wadj * G).T @ u, assume_a='pos')
                 delta_mu = u - G @ ((wadj * G).T @ u) + G @ (GtWG @ M)
                 clip(delta_mu, dmu_bound)
             except Exception as e:
@@ -107,7 +107,7 @@ def infer_single_trial(trial, params, config):
                 G = prior[l]
                 GtWG = G.T @ (w[:, l, np.newaxis] * G)
                 try:
-                    M = solve(Ir + GtWG, GtWG, sym_pos=True)
+                    M = solve(Ir + GtWG, GtWG, assume_a='pos')
                     v[:, l] = np.sum(G * (G - G @ GtWG + G @ (GtWG @ M)), axis=1)
                 except Exception as e:
                     logger.exception(repr(e), exc_info=True)
@@ -190,7 +190,7 @@ def mstep(trials, params, config):
 
                     try:
                         jitter = np.diag(np.full_like(grad_a, fill_value=config["eps"]))
-                        delta_a = solve(nhess_a + jitter, grad_a, sym_pos=True)
+                        delta_a = solve(nhess_a + jitter, grad_a, assume_a='pos')
                     except Exception as e:
                         logger.exception(repr(e), exc_info=True)
                         delta_a = learning_rate * grad_a
@@ -208,7 +208,7 @@ def mstep(trials, params, config):
                     nhess_b = x[..., n].T @ (r[:, np.newaxis, n] * x[..., n])
                     try:
                         jitter = np.diag(np.full_like(grad_b, fill_value=config["eps"]))
-                        delta_b = solve(nhess_b + jitter, grad_b, sym_pos=True)
+                        delta_b = solve(nhess_b + jitter, grad_b, assume_a='pos')
                     except Exception as e:
                         logger.exception(repr(e), exc_info=True)
                         delta_b = learning_rate * grad_b
@@ -223,14 +223,14 @@ def mstep(trials, params, config):
                 # (m'm + diag(j'v))^-1 m'(y - Hb)
                 M = mu.T @ mu
                 M[np.diag_indices_from(M)] += np.sum(v, axis=0)
-                a[:, n] = solve(M, mu.T @ (y[:, n] - x[..., n] @ b[:, n]), sym_pos=True)
+                a[:, n] = solve(M, mu.T @ (y[:, n] - x[..., n] @ b[:, n]), assume_a='pos')
 
                 # b's least squares solution for Gaussian channel
                 # (H'H)^-1 H'(y - ma)
                 b[:, n] = solve(
                     x[..., n].T @ x[..., n],
                     x[..., n].T @ (y[:, n] - mu @ a[:, n]),
-                    sym_pos=True,
+                    assume_a='pos',
                 )
                 b[1:, n] = 0
                 # TODO: only make history filter components zeros
@@ -462,7 +462,7 @@ def update_v(trials, params, config):
                 v[:, l] = np.sum(
                     G
                     * (
-                        G - G @ GtWG + G @ (GtWG @ solve(Ir + GtWG, GtWG, sym_pos=True))
+                        G - G @ GtWG + G @ (GtWG @ solve(Ir + GtWG, GtWG, assume_a='pos'))
                     ),
                     axis=1,
                 )
